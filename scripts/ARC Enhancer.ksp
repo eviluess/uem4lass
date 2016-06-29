@@ -1,0 +1,811 @@
+{***********************************************
+LASS2 ARC Enhancer v2
+Multi Version
+Author: eviluess@qq.com (jemuillot@gmail.com)
+Written by: Eviluess
+Homepage: http://www.douban.com/note/489219442/
+History:
+May 16, 2016
+    CC68 divided into general on/off range (0~63 and 64~127)
+March 22, 2015
+    Change the layout
+	CC43 controls velocity of short notes (Expression LSB). More reasonable than CC44
+	CC44-~CC47 Control Slam (LSB of CC12~CC15). More reasonable than CC40~CC43
+	CC121 also resets Pattern Index
+	Remove Restore/Legacy Button, add Economy Mode On/Off (CC31: 0~63=Off, 64~127=On, default=0)
+	Economy Button changes to Restore Button to reset CCs and CC Map to default during Learn
+	CC9 controls Bartok or Cello Full Staccato Loose. Not using CC31 any more
+	CC70 X-fades 1st & 2nd Chair because there's no Sordino
+	Individual 2nd Chair multis are removed because of above reason
+December 13, 2014
+	Add FOR2NDCHAIR switch
+	Fix misspellings
+April 5, 2014
+    Key switch velocity to activate or de-activate the Double effect of Stac, Harmonic and Bartok
+    Direct Control & Still support MIDI Learn
+    Backward compatible with legacy CCs (ARC v1.06)
+Created: March 24, 2013
+*************************************************}
+
+on init
+
+set_script_title("LASS2 Enhancer by Evi")
+declare const $FOR2NDCHAIR := 0
+declare const $HASBARTOK := 1  {0 for Cello Full Staccato Loose}
+declare const $LOGGING := 0
+declare $dc := 0
+declare $HybridChn
+
+if ($LOGGING = 1)
+set_ui_height(5)
+end if
+
+if ($HASBARTOK = 1)
+ $HybridChn := 8
+else
+ $HybridChn := 4
+end if
+
+declare $CtrlUpdated := 0
+declare $NeedRefreshCC11 := 0
+
+declare %CCMapper[128]
+declare %CtrlId[128]
+declare %CCReflection[128]
+
+declare %chnexp[8] {only 0, 1, 5 are used}
+
+make_persistent(%CCMapper)
+read_persistent_var(%CCMapper)
+
+{temp vars}
+
+declare $actexp
+declare $mapper
+
+$mapper := 0
+
+while ($mapper < 128)
+ %CtrlId[$mapper] := -1
+ inc($mapper)
+end while
+
+{TremoloXfade}
+declare ui_knob $TremoloXfade (0,127,1)
+set_text($TremoloXfade,"TremXFd")
+set_control_help ($TremoloXfade,"0-->127 ==> Sus --> Trem")
+move_control($TremoloXfade,1,1)
+%CtrlId[77] := get_ui_id($TremoloXfade)
+
+{SpicSlam}
+declare ui_knob $SpicSlam (0,127,1)
+set_text($SpicSlam,"SpicSlam")
+set_control_help ($SpicSlam,"Slam Amount for Spic")
+move_control($SpicSlam,1,1)
+%CtrlId[44] := get_ui_id($SpicSlam)
+
+{StacSlam}
+declare ui_knob $StacSlam (0,127,1)
+set_text($StacSlam,"StacSlam")
+set_control_help ($StacSlam,"Slam Amount for Stac")
+move_control($StacSlam,1,1)
+%CtrlId[45] := get_ui_id($StacSlam)
+
+{PizzSlam}
+declare ui_knob $PizzSlam (0,127,1)
+set_text($PizzSlam,"PizzSlam")
+set_control_help ($PizzSlam,"Slam Amount for Pizz")
+move_control($PizzSlam,1,1)
+%CtrlId[46] := get_ui_id($PizzSlam)
+
+{Bartock Pizzicato Slam}
+declare ui_knob $BartockPizzSlam(0,127,1)
+set_text($BartockPizzSlam,"BkPizSlm")
+set_control_help ($BartockPizzSlam,"Slam Amount for Bartock Pizzicato")
+move_control($BartockPizzSlam,1,1)
+%CtrlId[47] := get_ui_id($BartockPizzSlam)
+
+{RhythmSwitch}
+declare ui_knob $RhythmSwitch(0,127,1)
+set_text($RhythmSwitch,"RhymSw")
+set_control_help ($RhythmSwitch,"Enable or Disable the Rhythm Machine")
+move_control($RhythmSwitch,1,1)
+%CtrlId[68] := get_ui_id($RhythmSwitch)
+
+{SordinoXfade}
+declare ui_knob $SordinoXfade (0,127,1)
+if ($FOR2NDCHAIR = 1)
+set_text($SordinoXfade,"2ndChrX")
+set_control_help ($SordinoXfade,"0-->127 ==> 1st --> 2nd Chair X-fade")
+else
+set_text($SordinoXfade,"SordXFd")
+set_control_help ($SordinoXfade,"0-->127 ==> Sus --> Sord")
+end if
+move_control($SordinoXfade,1,1)
+%CtrlId[70] := get_ui_id($SordinoXfade)
+
+{SpicDepth}
+declare ui_knob $SpicDepth(0,127,1)
+set_text($SpicDepth,"SpicDpth")
+set_control_help ($SpicDepth,"Depth of the Spiccato")
+move_control($SpicDepth,1,1)
+%CtrlId[12] := get_ui_id($SpicDepth)
+
+{StacDepth}
+declare ui_knob $StacDepth(0,127,1)
+set_text($StacDepth,"StacDpth")
+set_control_help ($StacDepth,"Depth of the Staccato")
+move_control($StacDepth,1,1)
+%CtrlId[13] := get_ui_id($StacDepth)
+
+{LongDepth}
+declare ui_knob $LongDepth(0,127,1)
+set_text($LongDepth,"LongDpth")
+set_control_help ($LongDepth,"Depth of the Long Tones")
+move_control($LongDepth,1,1)
+%CtrlId[14] := get_ui_id($LongDepth)
+
+{HybridXFade}
+declare ui_knob $HybridXFade(0,127,1)
+if ($HASBARTOK = 1)
+set_text($HybridXFade,"BPzPrcXfd")
+set_control_help ($HybridXFade,"Normal <-----> Percussion EQ Crossfade for Bartok Bass Pizz")
+%CtrlId[9] := get_ui_id($HybridXFade)
+else
+set_text($HybridXFade,"LooslamXfd")
+set_control_help ($HybridXFade,"Slam <-----> Loose Crossfade for Celli Staccato")
+%CtrlId[9] := get_ui_id($HybridXFade)
+end if
+move_control($HybridXFade,1,1)
+
+declare ui_switch $LearnButton
+set_text($LearnButton,"Learn")
+set_control_help($LearnButton,"MIDI Learn")
+move_control($LearnButton,6,3)
+
+declare ui_switch $Economy
+set_control_help($Economy,"Economy Mode")
+set_text($Economy, "Economy")
+move_control($Economy,6,4)
+
+make_persistent($Economy)
+read_persistent_var($Economy)
+
+{Log}
+declare ui_label $Log(6,6)
+if ($LOGGING = 1)
+move_control($Log,1,1)
+set_text($Log, "")
+else
+move_control($Log,0,0)
+end if
+
+
+declare $touched
+declare $touched_original_cc
+declare $monitor_value
+
+declare $inchn
+declare $incc
+declare $inccval
+
+declare $hmi_channel := 0
+declare $hmi_command
+declare $hmi_byte1
+declare $hmi_byte2
+
+declare $bk_byte1
+declare $bk_byte2
+
+declare $pending_ignore
+
+declare %ccval[128]
+make_persistent(%ccval)
+read_persistent_var(%ccval)
+
+{Key Switches}
+declare	$ksw := 0
+declare	$kswvel
+make_persistent($ksw)
+read_persistent_var($ksw)
+make_persistent($kswvel)
+read_persistent_var($kswvel)
+declare %DblChn[7]
+
+%DblChn[0] := 0 {C, All}
+%DblChn[1] := 7 {#C, Trill}
+%DblChn[2] := 3 {D, Spic}
+%DblChn[3] := 6 {#D, Harmonic}
+%DblChn[4] := 4 {E, Stac}
+%DblChn[5] := 2 {F, Pizz}
+%DblChn[6] := 8 {#F, BB-Pizz}
+
+  $mapper := 0
+
+  while ($mapper < 128)
+   %CCReflection[$mapper] := -1
+   inc($mapper)
+  end while
+
+  $mapper := 0
+
+  while ($mapper < 128)
+   if (%CCReflection[%CCMapper[$mapper]] = -1)
+   %CCReflection[%CCMapper[$mapper]] := $mapper
+   end if
+   inc($mapper)
+  end while
+
+  $mapper := 0
+
+  while ($mapper < 128)
+  if (%CtrlId[$mapper] >= 0)
+   set_control_par(%CtrlId[$mapper], $CONTROL_PAR_VALUE, %ccval[$mapper])
+   set_control_par_str(%CtrlId[$mapper], $CONTROL_PAR_LABEL, %CCReflection[$mapper] & ":" & %ccval[$mapper])
+  end if
+  inc($mapper)
+  end while
+
+end on
+
+
+function handle_expression
+
+if ($incc = 11)
+$pending_ignore := 1
+end if
+
+if ($inchn # 1 and $inchn # 3 and $inchn # 4 and $inchn # 5)
+
+if ($incc = 11 or $incc = 14 or $incc = 77 or $incc = 70 or $incc = 12 or $incc = 13)
+$actexp := (%ccval[11] * %ccval[14] * (127 - %ccval[77]) * (127 - %ccval[70])) / (127 * 127 * 127)
+%chnexp[0] := $actexp
+set_midi(0, $MIDI_COMMAND_CC, 11, $actexp )
+$actexp := (%ccval[11] * %ccval[14] * %ccval[77]) / (127 * 127)
+%chnexp[1] := $actexp
+set_midi(1, $MIDI_COMMAND_CC, 11, $actexp )
+$actexp := (%ccval[11] * %ccval[14] * (127 - %ccval[77]) * %ccval[70]) / (127 * 127 * 127)
+%chnexp[5] := $actexp
+set_midi(5, $MIDI_COMMAND_CC, 11, $actexp )
+
+if ($ksw = 0)
+$actexp := (%ccval[11] * %ccval[12]) / 127
+set_midi(3, $MIDI_COMMAND_CC, 11, $actexp )
+
+$actexp := (%ccval[11] * %ccval[13]) / 127
+set_midi(4, $MIDI_COMMAND_CC, 11, $actexp )
+
+end if
+
+if ($incc = 11)
+
+set_midi(2, $MIDI_COMMAND_CC, 11, %ccval[11])
+set_midi(6, $MIDI_COMMAND_CC, 11, %ccval[11])
+set_midi(7, $MIDI_COMMAND_CC, 11, %ccval[11])
+set_midi(8, $MIDI_COMMAND_CC, 11, %ccval[11])
+
+end if
+
+end if
+
+else {other ch/ksw}
+
+if ($ksw = 2)
+set_midi(3, $MIDI_COMMAND_CC, 11, %ccval[11] )
+end if
+
+if ($ksw = 4)
+set_midi(4, $MIDI_COMMAND_CC, 11, %ccval[11] )
+end if
+
+end if
+
+end function
+
+function remapccs
+
+%ccval[$incc] := $inccval
+
+call handle_expression
+
+if ($incc = 111 or $incc = 110 or $incc = 2 or $incc = 1)
+    $pending_ignore := 1
+    set_midi(0, $MIDI_COMMAND_CC, $incc, %ccval[$incc])
+    set_midi(1, $MIDI_COMMAND_CC, $incc, %ccval[$incc])
+    set_midi(5, $MIDI_COMMAND_CC, $incc, %ccval[$incc])
+    set_midi(7, $MIDI_COMMAND_CC, $incc, %ccval[$incc])
+end if
+
+if ($incc = 43)
+    $pending_ignore := 1
+    set_midi(2, $MIDI_COMMAND_CC, $incc, %ccval[$incc])
+    set_midi(3, $MIDI_COMMAND_CC, $incc, %ccval[$incc])
+    set_midi(4, $MIDI_COMMAND_CC, $incc, %ccval[$incc])
+    set_midi(8, $MIDI_COMMAND_CC, $incc, %ccval[$incc])
+end if
+
+if ($incc = 10 or $incc = 7)
+    $pending_ignore := 1
+    $mapper := 0
+    while ($mapper < 9)
+    set_midi($mapper, $MIDI_COMMAND_CC, $incc, %ccval[$incc])
+    inc($mapper)
+    end while
+end if
+
+if ($incc = 9)
+    $pending_ignore := 1
+    set_midi($HybridChn, $MIDI_COMMAND_CC, 9, %ccval[$incc])
+end if
+
+if ($inchn = 3 or $inchn = 4) {Spiccato & Staccato}
+
+if ($ksw = 0 and $incc = 64 and %ccval[64] > 63 and %ccval[68] < 64)
+$pending_ignore := 1
+exit
+end if
+
+if ($incc = 68)
+if (%ccval[68] > 63)
+set_midi($inchn, $MIDI_COMMAND_CC, 64, %ccval[64])
+else
+%ccval[64] := 0
+set_midi($inchn, $MIDI_COMMAND_CC, 64, 0)
+set_midi($inchn, $MIDI_COMMAND_CC, 123, 0)
+end if
+exit
+end if
+
+end if
+end function
+
+
+function key_switched
+    {add_text_line($Log,$dc & ". key_switched: " & $ksw & "-" & $kswvel)
+    inc($dc)}
+
+    if ($ksw > 6)
+        exit
+    end if
+
+    if ($kswvel > 99)
+        set_midi(%DblChn[$ksw], $MIDI_COMMAND_CC, 88, 127)
+    else
+        set_midi(%DblChn[$ksw], $MIDI_COMMAND_CC, 88, 0)
+    end if
+
+    if ($ksw = 1)
+    if ($kswvel > 99)
+        set_midi(7, $MIDI_COMMAND_NOTE_ON, 107, 127)
+        set_midi(7, $MIDI_COMMAND_NOTE_OFF, 107, 0)
+    else
+        set_midi(7, $MIDI_COMMAND_NOTE_ON, 105, 127)
+        set_midi(7, $MIDI_COMMAND_NOTE_OFF, 105, 0)
+    end if
+    end if
+
+    if ($ksw = 0)
+        $NeedRefreshCC11 := 1
+    end if
+
+    {set_text($Economy,%DblChn[$ksw] & "-" & $kswvel)}
+end function
+
+function handle_midi_in
+
+$pending_ignore := 0
+$inchn := $hmi_channel
+
+if ($CtrlUpdated = 0 or ($MIDI_COMMAND_CC = $hmi_command and $hmi_byte1 = 121))
+$CtrlUpdated := 1
+$NeedRefreshCC11 := 0
+
+if ($MIDI_COMMAND_CC = $hmi_command and $hmi_byte1 = 121)
+{Check All Resets!}
+$ksw := 0
+$kswvel := 1
+
+%ccval[77] := 0
+%ccval[70] := 0
+%ccval[9] := 0
+%ccval[47] := 0
+%ccval[46] := 0
+%ccval[45] := 0
+%ccval[44] := 0
+%ccval[68] := 0
+%ccval[14] := 127
+%ccval[12] := 0
+%ccval[13] := 0
+
+%ccval[2] := 127
+%ccval[43] := 127
+
+set_midi(0, $MIDI_COMMAND_CC, 110, 0)
+set_midi(1, $MIDI_COMMAND_CC, 110, 0)
+set_midi(5, $MIDI_COMMAND_CC, 110, 0)
+set_midi(7, $MIDI_COMMAND_CC, 110, 0)
+
+set_midi(0, $MIDI_COMMAND_CC, 2, 127)
+set_midi(1, $MIDI_COMMAND_CC, 2, 127)
+set_midi(5, $MIDI_COMMAND_CC, 2, 127)
+
+set_midi($HybridChn, $MIDI_COMMAND_CC, 9, 0)
+
+set_midi(2, $MIDI_COMMAND_CC, 88, 0)
+set_midi(3, $MIDI_COMMAND_CC, 88, 0)
+set_midi(4, $MIDI_COMMAND_CC, 88, 0)
+set_midi(6, $MIDI_COMMAND_CC, 88, 0)
+set_midi(8, $MIDI_COMMAND_CC, 88, 0)
+
+set_midi(0, $MIDI_COMMAND_CC, 111, 0)
+set_midi(1, $MIDI_COMMAND_CC, 111, 0)
+set_midi(5, $MIDI_COMMAND_CC, 111, 0)
+set_midi(7, $MIDI_COMMAND_CC, 111, 0)
+
+set_midi(2, $MIDI_COMMAND_NRPN, 1039, 1)
+set_midi(3, $MIDI_COMMAND_NRPN, 1039, 1)
+set_midi(4, $MIDI_COMMAND_NRPN, 1039, 1)
+set_midi(8, $MIDI_COMMAND_NRPN, 1039, 1)
+
+set_midi(2, $MIDI_COMMAND_NRPN, 1045, %ccval[46]*100/127)
+set_midi(3, $MIDI_COMMAND_NRPN, 1045, %ccval[44]*100/127)
+set_midi(4, $MIDI_COMMAND_NRPN, 1045, %ccval[45]*100/127)
+set_midi(8, $MIDI_COMMAND_NRPN, 1045, %ccval[47]*100/127)
+
+$mapper := 0
+while ($mapper < 9)
+set_midi($mapper, $MIDI_COMMAND_CC, 10, 64)
+set_midi($mapper, $MIDI_COMMAND_CC, 7, 127)
+inc($mapper)
+end while
+
+$Economy := 0
+
+end if
+
+%ccval[11] := 127
+%ccval[1] := 127
+
+set_midi(0, $MIDI_COMMAND_CC, 1, 127)
+set_midi(1, $MIDI_COMMAND_CC, 1, 127)
+set_midi(5, $MIDI_COMMAND_CC, 1, 127)
+set_midi(7, $MIDI_COMMAND_CC, 1, 127)
+
+set_midi(2, $MIDI_COMMAND_CC, 43, %ccval[43])
+set_midi(3, $MIDI_COMMAND_CC, 43, %ccval[43])
+set_midi(4, $MIDI_COMMAND_CC, 43, %ccval[43])
+set_midi(8, $MIDI_COMMAND_CC, 43, %ccval[43])
+
+set_midi($HybridChn, $MIDI_COMMAND_CC, 9, %ccval[9])
+
+$mapper := 0
+while ($mapper < 128)
+if (%CtrlId[$mapper] >= 0)
+set_control_par(%CtrlId[$mapper], $CONTROL_PAR_VALUE, %ccval[$mapper])
+set_control_par_str(%CtrlId[$mapper], $CONTROL_PAR_LABEL, %CCReflection[$mapper] & ":" & %ccval[$mapper])
+end if
+inc($mapper)
+end while
+
+$incc := 11
+$inccval := 127
+
+call handle_expression
+
+$pending_ignore := 0
+
+end if
+
+if ($MIDI_COMMAND_NOTE_ON = $hmi_command and $hmi_byte2 > 0) {Key switch}
+
+	if ($inchn = 15)
+		$ksw := $hmi_byte1
+		$kswvel := $hmi_byte2
+		call key_switched
+		$pending_ignore := 1
+	end if
+
+end if
+
+if ($MIDI_COMMAND_NRPN = $hmi_command and $hmi_byte1 = 2002)
+    $pending_ignore := 1
+    $mapper := 0
+    while ($mapper < 9)
+    set_midi($mapper, $MIDI_COMMAND_CC, 4, $hmi_byte2 * 127)
+    inc($mapper)
+    end while
+end if
+
+if ($MIDI_COMMAND_CC = $hmi_command)
+
+if ($LearnButton = 1)
+$monitor_value := $hmi_byte1
+set_text($LearnButton,"Bind #" & $hmi_byte1)
+end if
+
+$incc := %CCMapper[$hmi_byte1]
+$inccval := $hmi_byte2
+
+call remapccs
+
+select ($incc)
+case 44
+  	$pending_ignore := 1
+	set_midi(3, $MIDI_COMMAND_NRPN, 1045, $inccval*100/127)
+case 45
+    $pending_ignore := 1
+	set_midi(4, $MIDI_COMMAND_NRPN, 1045, $inccval*100/127)
+case 46
+    $pending_ignore := 1
+	set_midi(2, $MIDI_COMMAND_NRPN, 1045, $inccval*100/127)
+case 47
+    $pending_ignore := 1
+	set_midi(8, $MIDI_COMMAND_NRPN, 1045, $inccval*100/127)
+case 31
+    $pending_ignore := 1
+	if ($inccval > 63)
+	$Economy := 1
+	else
+	$Economy := 0
+	end if
+end select
+
+else
+
+ {
+  add_text_line($Log,$dc & ". k: " & $ksw)
+  inc($dc)
+  }
+
+ if ($MIDI_COMMAND_NOTE_ON = $hmi_command and $hmi_byte2 > 0) { or $MIDI_COMMAND_NOTE_OFF = $hmi_command)}
+
+    if ((%ccval[14] = 0 or ( $Economy = 1 and %chnexp[$inchn] = 0)) and ...
+    	($inchn = 0 or $inchn = 1 or $inchn = 5))
+         $pending_ignore := 1
+    else
+	if (($inchn = 3 and %ccval[12] = 0 and $ksw # 2) or ...
+	    ($inchn = 4 and %ccval[13] = 0 and $ksw # 4) ...
+	    )
+	  $pending_ignore := 1
+	end if
+
+    end if
+
+ end if
+    
+end if
+
+{add_text_line($Log,$dc & ". i=" & $pending_ignore &" chn=" & $hmi_channel ...
+        &" cmd=" & $hmi_command & " 1=" & $hmi_byte1 & " 2=" & $hmi_byte2)
+    inc($dc)}
+
+end function
+
+on midi_in
+
+$hmi_channel := $MIDI_CHANNEL
+$hmi_command := $MIDI_COMMAND
+$hmi_byte1 := $MIDI_BYTE_1
+$hmi_byte2 := $MIDI_BYTE_2
+ignore_midi
+
+{add_text_line ($Log,$dc & ". ch:" & $hmi_channel & " cmd:" & $MIDI_COMMAND & " b1:" & $hmi_byte1)
+inc($dc)}
+
+call handle_midi_in
+
+if ($hmi_command = $MIDI_COMMAND_CC and %CtrlId[%CCMapper[$hmi_byte1]] >= 0)
+set_control_par(%CtrlId[%CCMapper[$hmi_byte1]], $CONTROL_PAR_VALUE, $hmi_byte2)
+set_control_par_str(%CtrlId[%CCMapper[$hmi_byte1]], $CONTROL_PAR_LABEL, %CCReflection[%CCMapper[$hmi_byte1]] & ":" & $hmi_byte2)
+end if
+
+
+if ($pending_ignore = 0)
+if ($MIDI_COMMAND_NOTE_ON = $hmi_command and $NeedRefreshCC11 = 1)
+
+$NeedRefreshCC11 := 0
+
+$bk_byte1 := $hmi_byte1
+$bk_byte2 := $hmi_byte2
+
+$hmi_command := $MIDI_COMMAND_CC
+$hmi_byte1 := 12
+$hmi_byte2 := %ccval[12]
+
+call handle_midi_in
+
+$hmi_byte1 := 13
+$hmi_byte2 := %ccval[13]
+
+call handle_midi_in
+
+$hmi_command := $MIDI_COMMAND_NOTE_ON
+$hmi_byte1 := $bk_byte1
+$hmi_byte2 := $bk_byte2
+
+end if
+
+set_midi($hmi_channel, $hmi_command, $hmi_byte1, $hmi_byte2)
+
+end if
+
+end on
+
+function update_control
+ $hmi_channel := 0
+ $hmi_command := $MIDI_COMMAND_CC
+ $hmi_byte1 := $touched_original_cc
+ $hmi_byte2 := get_control_par($touched, $CONTROL_PAR_VALUE)
+ call handle_midi_in
+ set_control_par_str($touched, $CONTROL_PAR_LABEL, %CCReflection[$hmi_byte1] & ":" & $hmi_byte2)
+end function
+
+on ui_control ($TremoloXfade)
+$touched := get_ui_id($TremoloXfade)
+$touched_original_cc := 77
+call update_control
+end on
+
+on ui_control ($SordinoXfade)
+$touched := get_ui_id($SordinoXfade)
+$touched_original_cc := 70
+call update_control
+end on
+
+on ui_control ($SpicSlam)
+$touched := get_ui_id($SpicSlam)
+$touched_original_cc := 44
+call update_control
+end on
+
+on ui_control ($StacSlam)
+$touched := get_ui_id($StacSlam)
+$touched_original_cc := 45
+call update_control
+end on
+
+on ui_control ($PizzSlam)
+$touched := get_ui_id($PizzSlam)
+$touched_original_cc := 46
+call update_control
+end on
+
+on ui_control ($BartockPizzSlam)
+$touched := get_ui_id($BartockPizzSlam)
+$touched_original_cc := 47
+call update_control
+end on
+
+on ui_control ($SpicDepth)
+$touched := get_ui_id($SpicDepth)
+$touched_original_cc := 12
+call update_control
+end on
+
+on ui_control ($StacDepth)
+$touched := get_ui_id($StacDepth)
+$touched_original_cc := 13
+call update_control
+end on
+
+on ui_control ($LongDepth)
+$touched := get_ui_id($LongDepth)
+$touched_original_cc := 14
+call update_control
+end on
+
+on ui_control ($RhythmSwitch)
+$touched := get_ui_id($RhythmSwitch)
+$touched_original_cc := 68
+call update_control
+end on
+
+on ui_control ($HybridXFade)
+$touched := get_ui_id($HybridXFade)
+$touched_original_cc := 9
+call update_control
+end on
+
+on ui_control ($LearnButton)
+if ($LearnButton = 1)
+set_text($LearnButton,"Learning")
+set_text($Economy,"Restore CCs")
+$monitor_value := -1
+else
+ if ($monitor_value >= 0 )
+  %CCMapper[$monitor_value] := $touched_original_cc
+  %CCReflection[$touched_original_cc] := $monitor_value
+ end if
+
+ set_text($LearnButton,"Learn")
+ set_text($Economy,"Economy")
+ call update_control
+end if
+end on
+
+on ui_control ($Economy)
+ 
+ if ($LearnButton = 0)
+ exit
+ end if
+ 
+ $LearnButton := 0
+ $Economy := 1-$Economy
+ set_text($LearnButton,"Learn")
+ set_text($Economy,"Economy")
+ 
+ $mapper := 0
+
+ while ($mapper < 128)
+ %CCMapper[$mapper] := $mapper
+ inc($mapper)
+ end while
+ 
+  $mapper := 0
+
+  while ($mapper < 128)
+   %CCReflection[$mapper] := -1
+   inc($mapper)
+  end while
+
+  $mapper := 0
+
+  while ($mapper < 128)
+   if (%CCReflection[%CCMapper[$mapper]] = -1)
+   %CCReflection[%CCMapper[$mapper]] := $mapper
+   end if
+   inc($mapper)
+  end while
+ 
+
+%ccval[68] := 0
+
+%ccval[14] := 127
+%ccval[12] := 0
+%ccval[13] := 0
+%ccval[77] := 0
+%ccval[70] := 0
+
+$hmi_channel := %DblChn[$ksw]
+$hmi_command := $MIDI_COMMAND_CC
+
+$hmi_byte2 := 0
+
+$hmi_byte1 := 44
+call handle_midi_in
+$hmi_byte1 := 45
+call handle_midi_in
+$hmi_byte1 := 46
+call handle_midi_in
+$hmi_byte1 := 47
+call handle_midi_in
+
+$hmi_byte1 := 9
+call handle_midi_in
+
+$hmi_byte2 := 127
+
+$hmi_byte1 := 11
+
+call handle_midi_in
+
+$hmi_byte1 := 2
+call handle_midi_in
+
+$hmi_byte1 := 1
+call handle_midi_in
+
+$hmi_byte1 := 43
+call handle_midi_in
+
+  $mapper := 0
+
+  while ($mapper < 128)
+  if (%CtrlId[$mapper] >= 0)
+   set_control_par(%CtrlId[$mapper], $CONTROL_PAR_VALUE, %ccval[$mapper])
+   set_control_par_str(%CtrlId[$mapper], $CONTROL_PAR_LABEL, %CCReflection[$mapper] & ":" & %ccval[$mapper])
+  end if
+  inc($mapper)
+  end while
+
+end on

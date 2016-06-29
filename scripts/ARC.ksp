@@ -1,9 +1,18 @@
+{***********************************************
+LASS2 ARC 1.2 Extension
+Author: jemuillot@gmail.com
+Written by: Jemuillot
+History: March 15, 2014
+   Support CC20~CC29 to control Stage parameters
+Created: Feb 5, 2014
+*************************************************}
 
 on init
 message("")
+
 declare const $syuob := 32
 set_ui_height_px( 540 )
-set_script_title("ARC 1.2")
+set_script_title("      ARC 1.2 Extension")
 declare %krwaf[128]
 declare %grioa[128]
 declare ui_label $go1bs (0,0)
@@ -13689,7 +13698,36 @@ declare $1ifhw
 declare $fb4sz
 declare $gn2sf
 declare $iz4ec
+declare $scChn
+declare %scaleMin[7]
+declare %scaleMax[7]
+declare %scaleCenter[4]
+declare $scaleResult
+%scaleMin[0] := 0
+%scaleMax[0] := 10000
+%scaleMin[1] := 1200
+%scaleMax[1] := 10000
+%scaleMin[2] := 0
+%scaleMax[2] := 10000
+%scaleMin[3] := 2500
+%scaleMax[3] := 7500
+%scaleMin[4] := 0
+%scaleMax[4] := 4000
+%scaleMin[5] := 0
+%scaleMax[5] := 4000
+%scaleMin[6] := 0
+%scaleMax[6] := 4000
+
+%scaleCenter[0] := 5000
+%scaleCenter[1] := 5600
+%scaleCenter[2] := 5000
+%scaleCenter[3] := 5000
+
+declare $kswset := 1
+
 end on
+
+
 function clear_display
 $l4mga := -1
 $sdfrx := -1
@@ -36200,6 +36238,13 @@ while ($fg4rw <= 24)
 inc($fg4rw)
 end while
 end select
+
+$fg4rw := 5
+while ($fg4rw <= 9)
+%li5wx[$fg4rw * 100 +  15] := 0
+inc($fg4rw)
+end while
+
 call transmit_current_preset
 if (in_range($vhnzs, 0, 24))
 call update_positioning_from_preset
@@ -36857,11 +36902,256 @@ if ($NI_ASYNC_ID = $lpi1t)
 $lpi1t := -1
 end if
 end on
+
+
 on midi_in
+
+if ($MIDI_COMMAND = $MIDI_COMMAND_CC)
+
+    if ($MIDI_BYTE_1 = 121)
+     $kswset := 0
+     $scChn := 0
+     while ($scChn < 9)
+     set_midi( $scChn, $MIDI_COMMAND_NRPN, (80+$vhnzs) * 100 + 11, %scaleCenter[0])
+     set_midi( $scChn, $MIDI_COMMAND_NRPN, (80+$vhnzs) * 100 + 12, %scaleMin[1])
+     set_midi( $scChn, $MIDI_COMMAND_NRPN, (80+$vhnzs) * 100 + 13, %scaleCenter[2])
+     set_midi( $scChn, $MIDI_COMMAND_NRPN, (80+$vhnzs) * 100 + 14, %scaleCenter[3])
+     set_midi( $scChn, $MIDI_COMMAND_NRPN, (80+$vhnzs) * 100 + 1, %scaleMin[4]) {24}
+     set_midi( $scChn, $MIDI_COMMAND_NRPN, (80+$vhnzs) * 100 + 2, %scaleMax[5])
+
+     set_midi( $scChn, $MIDI_COMMAND_NRPN, (80+$vhnzs) * 100 + 54, %scaleMin[6] ) {26*4}
+     set_midi( $scChn, $MIDI_COMMAND_NRPN, (80+$vhnzs) * 100 + 55, %scaleMin[6] )
+     set_midi( $scChn, $MIDI_COMMAND_NRPN, (80+$vhnzs) * 100 + 56, %scaleMin[6] )
+     set_midi( $scChn, $MIDI_COMMAND_NRPN, (80+$vhnzs) * 100 + 57, %scaleMin[6] )
+
+     inc($scChn)
+     end while
+
+     %li5wx[$vhnzs * 100 + 11] := %scaleCenter[0]
+     %li5wx[$vhnzs * 100 + 12] := %scaleMin[1]
+     %li5wx[$vhnzs * 100 + 13] := %scaleCenter[2]
+     %li5wx[$vhnzs * 100 + 14] := %scaleCenter[3]
+
+     %li5wx[$vhnzs * 100 + 1] := %scaleMin[4]
+     %li5wx[$vhnzs * 100 + 2] := %scaleMax[5]
+     %li5wx[$vhnzs * 100 + 54] := %scaleMin[6]
+
+     $v3jzz := (%li5wx[$vhnzs * 100 + 11]) / 10
+     $ez34q := (%li5wx[$vhnzs * 100 + 12]) / 10
+
+     $tqrjh := ((%li5wx[$vhnzs * 100 + 11]) / 20) - 15
+     if ($tqrjh < 0)
+     $tqrjh := 0
+     end if
+     if ($tqrjh > 483)
+     $tqrjh := 483
+     end if
+     $thoos := (100 - ((%li5wx[$vhnzs * 100 + 12]) / 100)) * 2 + 76
+     if ($thoos > 235)
+     $thoos := 235
+     end if
+
+     if ($hc5z0 = 1 or $pwhme = 1)
+     move_control_px($fpb4j,$tqrjh,$thoos)
+     move_control_px($dbk0k,$tqrjh + 22,$thoos + 130)
+     move_control_px($vuemi,$tqrjh + 43, $thoos + 144)
+     end if
+
+     $vuemi := (%li5wx[$vhnzs * 100 + 13])
+     $fpb4j := (%li5wx[$vhnzs * 100 + 14])
+
+     $wtbay := (%li5wx[$vhnzs * 100 + 1])
+     $rtfsx := (%li5wx[$vhnzs * 100 + 2])
+     $dbbp4 := %li5wx[$vhnzs * 100 + 54]
+
+     $xrhmt := 1
+     $nvwkw := 0
+     $4t04n := 0
+     $y4u1z := 0
+
+     $rgyxq := 0
+     
+     $iz4ec := 0
+     while ($iz4ec < 9)
+      set_midi( $iz4ec, $MIDI_COMMAND_CC, 4, 0)
+      inc($iz4ec)
+     end while
+
+    end if {121}
+
+    if ($MIDI_BYTE_1 = 4)
+     if ($MIDI_BYTE_2 < 63)
+     $rgyxq := 0
+     else
+     $rgyxq := 1
+     end if
+     
+     ignore_midi
+
+     $iz4ec := 0
+     while ($iz4ec < 9)
+      set_midi( $iz4ec, $MIDI_COMMAND_CC, 4, $rgyxq * 127 )
+      inc($iz4ec)
+     end while
+    end if
+
+    if ($MIDI_BYTE_1 = 111)
+     if ($MIDI_BYTE_2 < 85)
+     $xrhmt := 1
+     else
+     $xrhmt := 0
+     end if
+
+      if ($MIDI_BYTE_2 > 42 and $MIDI_BYTE_2 < 85)
+       $nvwkw := 1
+      else
+       $nvwkw := 0
+      end if
+
+     end if
+
+    if ($MIDI_BYTE_1 = 110)
+     if ($MIDI_BYTE_2 < 64)
+     $4t04n := 0
+     else
+     $4t04n := 1
+     end if
+
+      if ($MIDI_BYTE_2 > 31 and $MIDI_BYTE_2 < 96)
+       $y4u1z := 1
+      else
+       $y4u1z := 0
+      end if
+
+     end if
+
+	if ($MIDI_BYTE_1 >= 20 and $MIDI_BYTE_1 <= 23)
+	
+	$scChn := 0
+    if ($MIDI_BYTE_2 = 63 or $MIDI_BYTE_2 = 64)
+     $scaleResult := %scaleCenter[$MIDI_BYTE_1 - 20]
+    else
+ 	 $scaleResult := %scaleMin[$MIDI_BYTE_1 - 20] + $MIDI_BYTE_2 * (%scaleMax[$MIDI_BYTE_1 - 20] - %scaleMin[$MIDI_BYTE_1 - 20]) / 127
+    end if
+	%li5wx[$vhnzs * 100 + $MIDI_BYTE_1 - 20 + 11] := $scaleResult
+	while ($scChn < 9)
+	set_midi( $scChn, $MIDI_COMMAND_NRPN, (80+$vhnzs) * 100 + $MIDI_BYTE_1 - 20 + 11, $scaleResult )
+	inc($scChn)
+	end while
+	
+	if ($MIDI_BYTE_1 = 20)
+		$v3jzz := (%li5wx[$vhnzs * 100 + 11]) / 10
+	end if
+	
+	if ($MIDI_BYTE_1 = 21)
+		$ez34q := (%li5wx[$vhnzs * 100 + 12]) / 10
+	end if
+	
+	if ($MIDI_BYTE_1 < 22)
+		$tqrjh := ((%li5wx[$vhnzs * 100 + 11]) / 20) - 15
+		if ($tqrjh < 0)
+		$tqrjh := 0
+		end if
+		if ($tqrjh > 483)
+		$tqrjh := 483
+		end if
+		$thoos := (100 - ((%li5wx[$vhnzs * 100 + 12]) / 100)) * 2 + 76
+		if ($thoos > 235)
+		$thoos := 235
+		end if
+
+		if ($hc5z0 = 1 or $pwhme = 1)
+		move_control_px($fpb4j,$tqrjh,$thoos)
+		move_control_px($dbk0k,$tqrjh + 22,$thoos + 130)
+		move_control_px($vuemi,$tqrjh + 43, $thoos + 144)
+		end if
+	end if
+		
+	if ($MIDI_BYTE_1 = 22)
+		$vuemi := (%li5wx[$vhnzs * 100 + 13])
+	end if
+	
+	if ($MIDI_BYTE_1 = 23)
+		$fpb4j := (%li5wx[$vhnzs * 100 + 14])
+	end if
+		
+	ignore_midi
+	
+	end if
+	
+	if ($MIDI_BYTE_1 >= 24 and $MIDI_BYTE_1 <= 25)
+	
+	$scChn := 0
+	$scaleResult := %scaleMin[$MIDI_BYTE_1 - 20] + $MIDI_BYTE_2 * (%scaleMax[$MIDI_BYTE_1 - 20] - %scaleMin[$MIDI_BYTE_1 - 20]) / 127
+	%li5wx[$vhnzs * 100 + $MIDI_BYTE_1 - 24 + 1] := $scaleResult
+	while ($scChn < 9)
+	set_midi( $scChn, $MIDI_COMMAND_NRPN, (80+$vhnzs) * 100 + $MIDI_BYTE_1 - 24 + 1, $scaleResult )
+	inc($scChn)
+	end while
+	
+	if ($MIDI_BYTE_1 = 24)
+		$wtbay := (%li5wx[$vhnzs * 100 + 1])
+	end if
+	
+	if ($MIDI_BYTE_1 = 25)
+		$rtfsx := (%li5wx[$vhnzs * 100 + 2])
+	end if
+	
+	ignore_midi
+	
+	end if	
+	
+	if ($MIDI_BYTE_1 = 26)
+	
+	$scChn := 0
+	$scaleResult := %scaleMin[$MIDI_BYTE_1 - 20] + $MIDI_BYTE_2 * (%scaleMax[$MIDI_BYTE_1 - 20] - %scaleMin[$MIDI_BYTE_1 - 20]) / 127
+	%li5wx[$vhnzs * 100 + 54] := $scaleResult
+	while ($scChn < 9)
+	set_midi( $scChn, $MIDI_COMMAND_NRPN, (80+$vhnzs) * 100 + $MIDI_BYTE_1 - 26 + 54, $scaleResult )
+	set_midi( $scChn, $MIDI_COMMAND_NRPN, (80+$vhnzs) * 100 + $MIDI_BYTE_1 - 26 + 55, $scaleResult )
+	set_midi( $scChn, $MIDI_COMMAND_NRPN, (80+$vhnzs) * 100 + $MIDI_BYTE_1 - 26 + 56, $scaleResult )
+	set_midi( $scChn, $MIDI_COMMAND_NRPN, (80+$vhnzs) * 100 + $MIDI_BYTE_1 - 26 + 57, $scaleResult )
+	inc($scChn)
+	end while
+
+	$dbbp4 := %li5wx[$vhnzs * 100 + 54]
+	
+	ignore_midi
+	
+	end if		
+	
+	if ($MIDI_BYTE_1 >= 27 and $MIDI_BYTE_1 <= 29)
+	
+	$scChn := 0
+	
+	if ($MIDI_BYTE_2 > 63)
+		$scaleResult := 0
+	else
+	  $scaleResult := 1
+	end if
+	
+	%li5wx[$vhnzs * 100 + $MIDI_BYTE_1 - 27 + 58] := $scaleResult
+	
+	while ($scChn < 9)
+	set_midi( $scChn, $MIDI_COMMAND_NRPN, (80+$vhnzs) * 100 + $MIDI_BYTE_1 - 27 + 58, $scaleResult )
+	inc($scChn)
+	end while
+	
+	$0c3pp := abs( (%li5wx[$vhnzs * 100 + 58]) - 1 )
+	$0auok := abs( (%li5wx[$vhnzs * 100 + 59]) - 1 )
+	$s0ogk := abs( (%li5wx[$vhnzs * 100 + 60]) - 1 )	
+	
+	ignore_midi
+	
+	end if		
+end if
+
 if ($MIDI_COMMAND = $MIDI_COMMAND_CC and search( %xpcjr, $MIDI_BYTE_1 ) # -1)
 ignore_midi
 exit
+
 end if
+
 if ($MIDI_COMMAND = $MIDI_COMMAND_CC)
 %2ut4i[$MIDI_CHANNEL*128 + $MIDI_BYTE_1] := $MIDI_BYTE_2
 end if
@@ -36880,6 +37170,15 @@ while ($hz0ap < $ucvzc)
 if ( %jib41[$hz0ap] = $MIDI_CHANNEL )
 ignore_midi
 %xk2rk[$hz0ap] := 0
+
+if ( $MIDI_COMMAND = $MIDI_COMMAND_NOTE_ON and ...
+$MIDI_BYTE_2 > 0 and ...
+in_range( $MIDI_BYTE_1, ...
+%wwhqi[0], %wwhqi[0]+11 ) ...
+)
+	 set_midi(15, $MIDI_COMMAND_NOTE_ON, $MIDI_BYTE_1 - %wwhqi[0], $MIDI_BYTE_2)
+end if
+
 if ( ($MIDI_COMMAND = $MIDI_COMMAND_NOTE_ON and ...
 $MIDI_BYTE_2 > 0 and ...
 %aarxz[$hz0ap] # $MIDI_BYTE_1 - %wwhqi[$hz0ap] and ...
@@ -36887,15 +37186,29 @@ in_range( $MIDI_BYTE_1, ...
 %wwhqi[$hz0ap], %wwhqi[$hz0ap]+11 ) ...
 ) or ...
 ( $MIDI_COMMAND = $MIDI_COMMAND_PROGRAM_CHANGE and ...
-in_range($MIDI_BYTE_1, 0, 11) ...
+in_range($MIDI_BYTE_1, 0, 11) or ...
+($kswset = 0) ...
 ) ...
 )
 %w2tdv[$hz0ap] := %aarxz[$hz0ap]
-if ($MIDI_COMMAND = $MIDI_COMMAND_NOTE_ON)
+if (($MIDI_COMMAND = $MIDI_COMMAND_NOTE_ON) and ...
+    in_range( $MIDI_BYTE_1, ...
+%wwhqi[$hz0ap], %wwhqi[$hz0ap]+11 ) ...
+) 
 %aarxz[$hz0ap] := $MIDI_BYTE_1 - %wwhqi[$hz0ap]
+$kswset := 1
 else
+if ($MIDI_COMMAND = $MIDI_COMMAND_PROGRAM_CHANGE)
 %aarxz[$hz0ap] := $MIDI_BYTE_1
+$kswset := 1
+else
+%aarxz[$hz0ap] := 0
+if ($kswset = 0)
+$kswset := 2
 end if
+end if
+end if
+
 $fb4sz := 0
 while ($fb4sz < $pi54i)
 if ( %xynp1[ $fb4sz + %aarxz[$hz0ap]*$pi54i + $hz0ap*$pi54i*$2pv1c ] > -1 and %4kfiv[ $fb4sz + %aarxz[$hz0ap]*$pi54i + $hz0ap*$pi54i*$2pv1c ] > -1 )
@@ -36921,6 +37234,11 @@ end if
 inc($ldsds)
 end while
 wait(10)
+if ($kswset = 2)
+    $kswset := 1
+    set_midi(15, $MIDI_COMMAND_CC, 121, 0)
+end if
+
 end if
 inc($vwvux)
 end while

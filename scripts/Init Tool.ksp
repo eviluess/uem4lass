@@ -1,0 +1,127 @@
+{***********************************************
+LASS2 Controller Init Tool for LASS2 Enhanced Multis v2
+Multi Version
+Author: eviluess@qq.com (jemuillot@gmail.com)
+Written by: Eviluess (Jemuillot)
+Homepage: http://www.douban.com/note/489219442/
+Feature History:
+	March 18, 2015
+	Modify CCs according to the new standards of v2
+Created: March 15, 2014
+    Insert Controllers to the host
+*************************************************}
+
+on init
+make_perfview
+set_script_title("CCs Init Tool by Eviluess")
+set_ui_height_px(50)
+set_control_par_str ($INST_WALLPAPER_ID,$CONTROL_PAR_PICTURE,"lass_wp")
+set_skin_offset(1440)
+
+declare ui_button $morecc
+move_control($morecc,6,1)
+set_text ($morecc, "More CCs")
+
+declare ui_button $allcc
+move_control($allcc,6,2)
+set_text ($allcc, "All CCs")
+
+declare ui_label $check_area(4,1)
+move_control_px($check_area,160,0)
+set_control_par(get_ui_id($check_area),$CONTROL_PAR_WIDTH,360)
+set_control_par(get_ui_id($check_area),$CONTROL_PAR_HEIGHT,50)
+set_control_par(get_ui_id($check_area),$CONTROL_PAR_TEXTPOS_Y,20)
+set_control_par(get_ui_id($check_area), $CONTROL_PAR_FONT_TYPE, 4)
+set_text ($check_area, "                             Drag to the host to init most main controls")
+set_control_par(get_ui_id($check_area), $CONTROL_PAR_DND_BEHAVIOUR, 1)
+declare $area_status
+
+mf_reset()
+mf_set_buffer_size(384)
+
+declare $i
+
+$i := 0
+
+while ($i <= 2)
+
+mf_insert_event(0,$i*1000+0,$MIDI_COMMAND_PROGRAM_CHANGE,0,0)
+mf_insert_event(0,$i*1000+480,$MIDI_COMMAND_NOTE_ON,60,127)
+mf_insert_event(0,$i*1000+640,$MIDI_COMMAND_NOTE_OFF,60,0)
+
+mf_insert_event(0,$i*1000+256,$MIDI_COMMAND_CC,20,64)
+mf_insert_event(0,$i*1000+264,$MIDI_COMMAND_CC,77,0)
+mf_insert_event(0,$i*1000+265,$MIDI_COMMAND_CC,70,0)
+mf_insert_event(0,$i*1000+266,$MIDI_COMMAND_CC,31,0)
+mf_insert_event(0,$i*1000+270,$MIDI_COMMAND_CC,21,0)
+mf_insert_event(0,$i*1000+280,$MIDI_COMMAND_CC,11,127)
+mf_insert_event(0,$i*1000+290,$MIDI_COMMAND_CC,22,64)
+mf_insert_event(0,$i*1000+300,$MIDI_COMMAND_CC,1,127)
+mf_insert_event(0,$i*1000+301,$MIDI_COMMAND_CC,2,127)
+mf_insert_event(0,$i*1000+316,$MIDI_COMMAND_CC,23,64)
+mf_insert_event(0,$i*1000+320,$MIDI_COMMAND_CC,12,0)
+mf_insert_event(0,$i*1000+321,$MIDI_COMMAND_CC,13,0)
+mf_insert_event(0,$i*1000+322,$MIDI_COMMAND_CC,14,127)
+
+if ($i > 0)
+mf_insert_event(0,$i*1000+180,$MIDI_COMMAND_CC,43,127)
+mf_insert_event(0,$i*1000+192,$MIDI_COMMAND_CC,44,0)
+mf_insert_event(0,$i*1000+193,$MIDI_COMMAND_CC,45,0)
+mf_insert_event(0,$i*1000+194,$MIDI_COMMAND_CC,46,0)
+mf_insert_event(0,$i*1000+195,$MIDI_COMMAND_CC,47,0)
+mf_insert_event(0,$i*1000+210,$MIDI_COMMAND_CC,110,0)
+mf_insert_event(0,$i*1000+230,$MIDI_COMMAND_CC,9,0)
+mf_insert_event(0,$i*1000+240,$MIDI_COMMAND_CC,111,0)
+end if
+
+if ($i > 1)
+mf_insert_event(0,$i*1000+6,$MIDI_COMMAND_CC,121,0)
+mf_insert_event(0,$i*1000+60,$MIDI_COMMAND_CC,24,0)
+mf_insert_event(0,$i*1000+80,$MIDI_COMMAND_CC,25,127)
+mf_insert_event(0,$i*1000+96,$MIDI_COMMAND_CC,10,64)
+mf_insert_event(0,$i*1000+100,$MIDI_COMMAND_CC,26,0)
+mf_insert_event(0,$i*1000+120,$MIDI_COMMAND_CC,4,0)
+mf_insert_event(0,$i*1000+128,$MIDI_COMMAND_CC,27,127)
+mf_insert_event(0,$i*1000+145,$MIDI_COMMAND_CC,64,0)
+mf_insert_event(0,$i*1000+150,$MIDI_COMMAND_CC,28,0)
+mf_insert_event(0,$i*1000+168,$MIDI_COMMAND_CC,68,0)
+mf_insert_event(0,$i*1000+172,$MIDI_COMMAND_CC,29,0)
+mf_insert_event(0,$i*1000+336,$MIDI_COMMAND_CC,7,127)
+end if
+
+inc($i)
+end while
+
+$area_status := mf_set_export_area("LASS2 Ultimate Init Stages",0,999,-1,-1)
+
+end on
+
+function update_mf_area
+
+if ($allcc = 1)
+$area_status := mf_set_export_area("LASS2 Ultimate Init All",2000,2999,-1,-1)
+ set_text ($check_area, "                                        Drag to the host to init all")
+else
+ if ($morecc = 1)
+ $area_status := mf_set_export_area("LASS2 Ultimate Init More",1000,1999,-1,-1)
+ set_text ($check_area, "                                   Drag to the host to init more CCs")
+else
+  $area_status := mf_set_export_area("LASS2 Ultimate Init Stage",0,999,-1,-1)
+  set_text ($check_area, "                             Drag to the host to init most main controls")
+ end if
+end if
+end function
+
+on ui_control($morecc)
+ if ($morecc = 1)
+  $allcc := 0
+ end if
+call update_mf_area
+end on
+
+on ui_control($allcc)
+ if ($allcc = 1)
+  $morecc := 0
+ end if
+call update_mf_area
+end on
